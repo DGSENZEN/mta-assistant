@@ -1,6 +1,15 @@
-def main():
-    print("Hello from mta-python-backend!")
+from fastapi import FastAPI 
+from pydantic import BaseModel
 
+app = FastAPI()
 
-if __name__ == "__main__":
-    main()
+class ExPostRequest(BaseModel):
+    sender: str
+    sender_id: int
+    body: str
+    timestamp: str | None = None
+    """"""
+
+@app.post("/test_endpoint")
+async def test_endpoint(msg: ExPostRequest):
+    return msg 

@@ -2,14 +2,14 @@ defmodule MtaExBackend do
   @moduledoc """ 
   Simple client to test an endpoint.
   """
-  @python_service_endpoint "http://127.0.0.1:5000/test_endpoint"
+  @python_service_endpoint "http://127.0.0.1:8000/test_endpoint"
 
   def test_post() do
     json_map = %{
-      from: "elixir_service",
-      test_id: 1,
-      message: "This is a test POST!",
-      timestamp: DateTime.utc_now()
+      sender: "elixir_service",
+      sender_id: 1,
+      body: "This is a test POST!",
+      timestamp: "#{DateTime.utc_now()}"
   
     }
 
@@ -21,7 +21,7 @@ defmodule MtaExBackend do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         IO.puts("Success! Response sent to the Python service!")
         {:ok, decoded_message} = Jason.decode(body)
-        IO.puts("#{decoded_message}", pretty: true)
+        IO.inspect(decoded_message, pretty: true)
 
       {:ok, %HTTPoison.Response{status_code: status_code, body: body}} ->
         IO.puts("Server responded with:#{status_code}")
@@ -32,5 +32,4 @@ defmodule MtaExBackend do
         IO.inspect(reason)
     end
   end
-
 end
