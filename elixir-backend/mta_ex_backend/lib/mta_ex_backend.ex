@@ -1,4 +1,4 @@
-defmodule MtaExProcessor do
+defmodule MtaExPoller do
   @moduledoc """ 
   Simple client to test an endpoint.
   """
@@ -49,5 +49,7 @@ defmodule MtaExProcessor do
         IO.inspect(reason)
     end
   end
+
+
 
 end
