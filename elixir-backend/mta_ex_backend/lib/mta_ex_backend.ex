@@ -7,49 +7,55 @@ defmodule MtaExPoller do
   @python_service_endpoint "http://127.0.0.1:8000/elixir_listener"
   @mta_realtime_endpoint "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw"
 
-  def mta_realtime_feed_protobuf() do
-    case process_protobuf() do
-      {:ok, payload} ->
-        payload_map = %{"mta_data" => Jason.decode!(payload)}
-        case HTTPoison.post(@python_service_endpoint, Jason.encode!(payload_map), [{"Content-Type", "application/json"}]) do 
-          {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-            IO.puts("[mta_realtime_feed_protobuf]: Success! Sent the MTA feed to the Python service!")
-            IO.inspect(body)
-
-          {:ok, %HTTPoison.Response{status_code: status_code, body: body}} ->
-            IO.puts("[mta_realtime_feed_protobuf]: Server responded with: #{status_code}")
-            IO.puts("Body: #{body}")
-
-
-          {:error, %HTTPoison.Error{reason: reason}} ->
-            IO.puts("[mta_realtime_feed_protobuf]: There was an error with communicating with the Python service! Error: #{reason}")
-            IO.inspect(reason)
-        end
-      
-      other ->
-        IO.puts("[mta_realtime_feed_protobuf]: Unable to send the protobuf to the Python service")
-        IO.inspect(other)
+  def fetch_mta_feed() do
+    with {:ok, fetched_protobuf} <- get_mta_rt_feed(),
+      {:ok, json_payload} <- decode_encode_protobuf(fetched_protobuf) do
+        {:ok, json_payload}
       end
   end
+                                          
+  def send_to_python_service(json_payload) do
+    headers = [{"Content-Type", "application/json"}]
+    options = [recv_timeout: 5000]
+    body = Jason.encode!(%{"mta_data" => Jason.decode!(json_payload)})
 
-  def process_protobuf() do
-    case HTTPoison.get(@mta_realtime_endpoint, [{"Content-Type", "application/x-protobuf"}], recv_timeout: 5000) do
+    case HTTPoison.post(@python_service_endpoint, body, headers, options) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        IO.puts("[process_protobuf]: Success! Obtained the protobuf binary for processing.")
-        processed_protobuf = FeedMessage.decode(body)
-        json_payload = Protobuf.JSON.encode(processed_protobuf)
-        IO.puts("[process_protobuf]: Successful processing of protobuf.")
-        json_payload
+        {:ok, "Succesfully sent the JSON to the Python service: 200, #{body}"}
 
       {:ok, %HTTPoison.Response{status_code: status_code, body: body}} ->
-        IO.puts("[process_protobuf]: Service responded with: #{status_code}, #{body}")
+        {:error, "Service responded with: #{status_code}, #{body}"}
 
       {:error, %HTTPoison.Error{reason: reason}} ->
-        IO.puts("[process_protobuf]: Error!")
-        IO.inspect(reason)
+        {:error, "Had an error communicating with the Python service: #{reason}"}
+
     end
+    
   end
 
+  defp get_mta_rt_feed() do
+    headers = [{"Content-Type", "application/x-protobuf"}]
+    options = [recv_timeout: 5000]
 
+    case HTTPoison.get(@mta_realtime_endpoint, headers, options) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        {:ok, body}
+
+      {:ok, %HTTPoison.Response{status_code: status_code}} ->
+        {:error, "MTA API responded with #{status_code}"}
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        {:error, "Could not fetch MTA feed: #{reason}"}
+    end
+  end 
+
+  defp decode_encode_protobuf(binary_body) do
+    try do
+      decoded_protobuf = FeedMessage.decode(binary_body)
+      json_payload = Protobuf.JSON.encode(decoded_protobuf)
+    rescue
+      e -> {:error, "Protobuf processing failed #{e}"}
+    end
+  end
 
 end
